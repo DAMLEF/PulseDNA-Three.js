@@ -1,0 +1,7 @@
+Distance dynamique
+const speedFactor = player.velocity.length();
+const dynamicDistance = baseDistance + speedFactor * 0.05;
+
+FOV dynamique
+camera.fov = lerp(70, 95, speedFactor / maxSpeed);
+camera.updateProjectionMatrix();
