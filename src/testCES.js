@@ -40,46 +40,6 @@ scene.add(cubeMesh)
 
 
 
-
-// Création du plane overlay
-const overlayGeometry = new THREE.PlaneGeometry(2, 2);
-const overlayMaterial = new THREE.ShaderMaterial({
-    transparent: true,
-    depthTest: false,      // ignore le depth buffer
-    depthWrite: false,     // ne bloque rien derrière
-    uniforms: {
-        uTime: { value: 0 },
-        uSpeed: { value: 0 },
-    },
-    vertexShader: `
-        varying vec2 vUv;
-        void main() {
-            vUv = uv;
-            gl_Position = vec4(position, 1.0);
-        }
-    `,
-    fragmentShader: `
-        uniform float uTime;
-        uniform float uSpeed;
-        varying vec2 vUv;
-
-        void main() {
-            // Dégradé vertical
-            vec3 color = mix(vec3(0.0,0.2,0.5), vec3(0.0,0.5,1.0), vUv.y);
-
-            // Distorsion simple avec sin
-            float offset = sin(vUv.y*10.0 + uTime*5.0) * 0.02 * uSpeed;
-            color.r += offset;
-
-            gl_FragColor = vec4(color, 0.3); // alpha léger
-        }
-    `
-});
-const overlayMesh = new THREE.Mesh(overlayGeometry, overlayMaterial);
-overlayMesh.frustumCulled = false; // toujours visible
-overlayMesh.renderOrder = 999;      // toujours render last
-camera.add(overlayMesh);
-
 // =====================
 // CANNON-ES (PHYSIQUE)
 // =====================
@@ -323,45 +283,3 @@ infoDiv.style.fontFamily = 'monospace'
 document.body.appendChild(infoDiv)
 
 
-// =====================
-// BOUCLE
-// =====================
-const clock = new THREE.Clock()
-
-function updateOverlay(deltaTime) {
-    // uTime pour le mouvement
-    overlayMaterial.uniforms.uTime.value += deltaTime;
-
-    // uSpeed = proportion de la vitesse du joueur
-    const v = pc.body.velocity;
-    const horizontalSpeed = Math.sqrt(v.x*v.x + v.z*v.z);
-    overlayMaterial.uniforms.uSpeed.value = horizontalSpeed / 30;
-}
-
-function animate() {
-    requestAnimationFrame(animate)
-
-    const delta = clock.getDelta()
-    world.step(1 / 60, delta)
-
-    // Synchronisation Cannon → Three
-    cubeMesh.position.copy(cubeBody.position)
-    cubeMesh.quaternion.copy(cubeBody.quaternion)
-
-    renderer.render(scene, camera)
-
-    pc.update(delta)
-
-    // ----- Affichage infos DEBUG -----
-    infoDiv.innerHTML = `
-    Position: x=${playerSphereBody.position.x.toFixed(2)}, 
-    y=${playerSphereBody.position.y.toFixed(2)}, 
-    z=${playerSphereBody.position.z.toFixed(2)}<br>
-    Camera rotation: yaw=${(pc.yawRotation*180/Math.PI).toFixed(1)}°, 
-    pitch=${(pc.pitchRotation*180/Math.PI).toFixed(1)}°`
-
-    updateOverlay(delta)
-    
-}
-
-animate()
