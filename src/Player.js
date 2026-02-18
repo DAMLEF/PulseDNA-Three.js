@@ -29,6 +29,18 @@ export class Player{
         this.speed = 5
         this.keys = {}
 
+        this.jumpHeight = 20;
+        this.timeToApex = 5;
+        this.fallMultiplier = 2.5;
+
+        // Calculs physiques dérivés
+        this.gravity = (2 * this.jumpHeight) / (this.timeToApex ** 2);
+        this.jumpVelocity = this.gravity * this.timeToApex;
+
+        this.isGrounded = false;
+        this.jumpRequest = false;
+
+        // Initialisation des callbacks
         this.initPointerLock();
         this.initMouseMove();
         this.initKeyboard();
@@ -115,8 +127,13 @@ export class Player{
             moveDirection.add(right)
         }
 
+        if(this.keys['Space']){
+            if(this.gameObject.body.velocity.y < 0.5 && this.isGrounded){
+                this.jumpRequest = true;
+            }
+        }
 
-
+        this.isGrounded = Math.abs(this.gameObject.body.velocity.y) < 0.1;
 
         if (this.keys['KeyF']){
             this.speed = 30
@@ -125,9 +142,9 @@ export class Player{
             this.speed = 5
         }
 
+        this.handleJump(dt)
+
         const body = this.gameObject.body;
-
-
 
         let velocity = new CANNON.Vec3(0, 0, 0)
 
@@ -157,5 +174,19 @@ export class Player{
 
     }
 
+    handleJump(dt){
+        if(this.isGrounded && this.jumpRequest){
+            this.isGrounded = false;
+            this.jumpRequest = false;
 
+            console.log("Unleash Height Speed");
+
+            this.gameObject.body.velocity.y = this.jumpVelocity;
+        }
+
+        if(this.gameObject.body.velocity.y > 0.5){
+            this.gameObject.body.velocity.y -= this.gravity *  this.fallMultiplier * dt
+        }
+
+    }
 }

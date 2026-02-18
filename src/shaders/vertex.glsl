@@ -1,36 +1,25 @@
-uniform vec3 playerPos;    // position du joueur
-uniform float maxDist;     // distance max avant dispersion
-uniform float time;        // temps pour animer un peu
-varying vec3 vColor;
 
-float rand(vec3 co){
-    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233, 45.164))) * 43758.5453);
-}
+
+    varying float vExplodeFactor;
+
+    uniform vec3 uPlayerPosition;
+    uniform float uMinDistance;
+    uniform float uMaxDistance;
+    uniform float uExplosionStrength;
 
     void main() {
-    //vec3 newPos = position;
-    vec3 newPos = (modelMatrix * vec4(position, 1.0)).xyz;
 
-    // distance du vertex au joueur
-    float dist = distance(playerPos, position);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
 
-    if(dist > maxDist){
-        // projection le long de la normale
-        vec3 offset = normal * (dist - maxDist);
+        float dist = distance(worldPos.xyz, uPlayerPosition);
 
-        // ajout d'un offset aléatoire
-        float r = rand(position);
-        offset += (r - 0.5) * 2.0; // décalage -1 à 1
+        float t = clamp((dist - uMinDistance) / (uMaxDistance - uMinDistance), 0.0, 1.0);
 
-        // Lerp selon distance pour effet progressif
-        float t = clamp((dist - maxDist) / 5.0, 0.0, 1.0);
-        newPos = mix(position, position + offset, t);
-    }
+        vec3 explodeOffset = normal * t * uExplosionStrength;
 
-    vColor = vec3(dist / maxDist, 0.5, 1.0); // juste pour debug couleur
+        vec4 displacedPosition = worldPos + vec4(explodeOffset, 0.0);
 
-    //gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+        gl_Position = projectionMatrix * viewMatrix * displacedPosition;
 
-    vec4 mvPosition = viewMatrix * vec4(newPos, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
+        vExplodeFactor = t;
     }

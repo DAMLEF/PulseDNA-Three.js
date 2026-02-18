@@ -35,60 +35,59 @@ scene.add(light)
 let gameObjects = [];
 
 // Sol (Three / Cannon)
+
 const groundObject = new GO.PlaneObject(150, new THREE.MeshStandardMaterial({ color: 0x808080 }));
 groundObject.setPosition(0, -0.05, 0);
 groundObject.initObject(scene, world, gameObjects)
 
 // Cube (Three / Cannon)
 
-let vertexShaderCode = "uniform vec3 playerPos;    // position du joueur\n" +
-    "uniform float maxDist;     // distance max avant dispersion\n" +
-    "uniform float time;        // temps pour animer un peu\n" +
-    "varying vec3 vColor;\n" +
-    "\n" +
-    "float rand(vec3 co){\n" +
-    "    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233, 45.164))) * 43758.5453);\n" +
-    "}\n" +
-    "\n" +
-    "    void main() {\n" +
-    "    //vec3 newPos = position;\n" +
-    "    vec3 newPos = (modelMatrix * vec4(position, 1.0)).xyz;\n" +
-    "\n" +
-    "    // distance du vertex au joueur\n" +
-    "    float dist = distance(playerPos, position);\n" +
-    "\n" +
-    "    if(dist > maxDist){\n" +
-    "        // projection le long de la normale\n" +
-    "        vec3 offset = normal * (dist - maxDist);\n" +
-    "\n" +
-    "        // ajout d'un offset aléatoire\n" +
-    "        float r = rand(position);\n" +
-    "        offset += (r - 0.5) * 2.0; // décalage -1 à 1\n" +
-    "\n" +
-    "        // Lerp selon distance pour effet progressif\n" +
-    "        float t = clamp((dist - maxDist) / 5.0, 0.0, 1.0);\n" +
-    "        newPos = mix(position, position + offset, t);\n" +
-    "    }\n" +
-    "\n" +
-    "    vColor = vec3(dist / maxDist, 0.5, 1.0); // juste pour debug couleur\n" +
-    "\n" +
-    "    //gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);\n" +
-    "\n" +
-    "    vec4 mvPosition = viewMatrix * vec4(newPos, 1.0);\n" +
-    "    gl_Position = projectionMatrix * mvPosition;\n" +
-    "    }"
+let vertexShaderCode = `
+
+    varying float vExplodeFactor;
+
+    uniform vec3 uPlayerPosition;
+    uniform float uMinDistance;
+    uniform float uMaxDistance;
+    uniform float uExplosionStrength;
+
+    void main() {
+
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+
+        float dist = distance(worldPos.xyz, uPlayerPosition);
+
+        float t = clamp((dist - uMinDistance) / (uMaxDistance - uMinDistance), 0.0, 1.0);
+
+        vec3 explodeOffset = normal * t * uExplosionStrength;
+
+        vec4 displacedPosition = worldPos + vec4(explodeOffset, 0.0);
+
+        gl_Position = projectionMatrix * viewMatrix * displacedPosition;
+
+        vExplodeFactor = t;
+    }
+  `;
 
 const testShaderMat = new THREE.ShaderMaterial({
     vertexShader: vertexShaderCode,
-    fragmentShader: 'varying vec3 vColor;\n' +
-        '\n' +
-        'void main() {\n' +
-        '    gl_FragColor = vec4(vColor, 1.0);\n' +
-        '}',
+    fragmentShader: `
+    varying float vExplodeFactor;
+
+    void main() {
+
+        vec3 baseColor = vec3(0.6, 0.6, 0.7);
+        vec3 explodedColor = vec3(1.0, 0.4, 0.2);
+
+        vec3 finalColor = mix(baseColor, explodedColor, vExplodeFactor);
+
+        gl_FragColor = vec4(finalColor, 1.0);
+    }`,
     uniforms: {
-        playerPos: { value: new THREE.Vector3(10,0,0) },
-        maxDist: { value: 5 },
-        time: { value: 0 }
+        uPlayerPosition: { value: new THREE.Vector3() },
+        uMinDistance: { value: 3.0 },   // x
+        uMaxDistance: { value: 15.0 },  // y
+        uExplosionStrength: { value: 2.0 }
     },
     side: THREE.DoubleSide,
     color: 0xff0000,
@@ -149,10 +148,11 @@ function animate() {
     y=${playerGO.body.position.y.toFixed(2)}, 
     z=${playerGO.body.position.z.toFixed(2)}<br>
     Camera rotation: yaw=${(p.yawRotation*180/Math.PI).toFixed(1)}°, 
-    pitch=${(p.pitchRotation*180/Math.PI).toFixed(1)}°`
+    pitch=${(p.pitchRotation*180/Math.PI).toFixed(1)}°<br>
+    Velocity : x =${playerGO.body.velocity.x.toFixed(1)} y=${playerGO.body.velocity.y.toFixed(1)} z=${playerGO.body.velocity.z.toFixed(1)}`
 
-    testShaderMat.uniforms.playerPos.value.copy(playerGO.body.position);
-    testShaderMat.uniforms.time.value = clock.getElapsedTime();
+    testShaderMat.uniforms.uPlayerPosition.value.copy(playerGO.body.position);
+
 
 }
 
