@@ -13,6 +13,8 @@ export class GameObject{
 
         this.body = new CANNON.Body({mass, shape});
 
+        this.fixRotation = false;
+
         // Synchronisation Three.JS <-> Cannon-es
         this.updateMeshFromBody();
 
@@ -30,16 +32,22 @@ export class GameObject{
         this.updateMeshFromBody();
     }
 
-    // TODO : Attention
-    //updateMeshFromBody() {
-    //    this.mesh.position.copy(this.body.position);
-    //    this.mesh.quaternion.copy(this.body.quaternion);
-    //}
+    setFixRotation(fix){
+        this.fixRotation = fix;
+    }
 
 
     updateMeshFromBody() {
+        this.mesh.position.copy(this.body.position);
+        this.mesh.quaternion.copy(this.body.quaternion);
+    }
+
+
+    FixUpdateMeshFromBody() {
         // Copier la position
-        this.mesh.position.copy(this.body.position)
+        let realMeshPos = new THREE.Vector3(this.body.position.x, this.body.position.y, this.body.position.z);
+
+        this.mesh.position.copy(realMeshPos)
 
         // Orientation uniquement sur l'axe Y (yaw)
         // Calculer la direction du joueur
@@ -55,7 +63,13 @@ export class GameObject{
 
     // Méthode update à appeler dans la boucle principale
     update(dt) {
-        this.updateMeshFromBody();
+        if(this.fixRotation){
+            this.FixUpdateMeshFromBody();
+        }
+        else{
+            this.updateMeshFromBody();
+        }
+
     }
 }
 
@@ -67,6 +81,16 @@ export class CubeObject extends GameObject {
 
 
         const shape = new CANNON.Box(new CANNON.Vec3(halfSize, halfSize, halfSize));
+
+        super(geometry, material, mass, shape);
+    }
+}
+
+export class BoxObject extends GameObject {
+    constructor(width, height, depth, mass, material = defaultMaterial) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+
+        const shape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2));
 
         super(geometry, material, mass, shape);
     }
@@ -97,10 +121,12 @@ export class PlaneObject extends GameObject {
 
         // On empêche le mouvement de gravité (plateforme fixe).
         this.body.type = CANNON.Body.STATIC;
+
     }
 
     update(dt) {
         super.update(dt);
         this.mesh.rotation.x = -Math.PI / 2
+        this.mesh.position.set(this.body.position.x, this.body.position.y + 1, this.body.position.z)
     }
 }

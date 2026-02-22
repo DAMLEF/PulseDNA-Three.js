@@ -19,23 +19,34 @@ export class Player{
 
         // GameObject du Joueur
         this.gameObject = gameObject;
+        this.gameObject.setFixRotation(true);
 
-        this.mixer = null;     // Structure pour gérer les animations
-        this.animations = {};
-        this.currentAnimation = "Idle";
+        this.gameObject.body.addEventListener("collide", (e) => {
+
+            if(e.contact.ni.y !== 0) {
+                this.isGrounded = true;
+            }
+            else{
+                this.isGrounded = false;
+            }
+        });
 
         // Redéfinition du Mesh du joueur (à l'aide des fichiers glb)
-        console.log(loader)
+        this.mixer = null;     // Structure pour gérer les animations
+        this.animations = {};
+        this.currentAnimation;
+
+                // Chargement du personnage
         loader.load('/assets/models/character.glb', (gltf) => {
 
             // Retirer l'ancien mesh
             delete gameObject.mesh
 
+            // Le personnage devient le nouveau mesh du joueur
             gameObject.mesh = gltf.scene
 
             this.mixer = new THREE.AnimationMixer(gameObject.mesh)
 
-            console.log("Lancement du chargement des animations");
 
             this.loadAnimations(loader)
 
@@ -59,7 +70,7 @@ export class Player{
 
         // -----------------------------------------
 
-        // Paramètres physique
+        // Paramètres physiques
 
         this.speed = 5
 
@@ -84,9 +95,6 @@ export class Player{
         this.initKeyboard();
 
 
-
-        console.log("FIN INITIALISATION");
-
     }
 
     initPointerLock() {
@@ -99,14 +107,7 @@ export class Player{
         document.addEventListener('mousemove', (event) => {
             if (document.pointerLockElement !== this.dE) return
 
-            this.yawRotation -= event.movementX * this.cameraSensitivity
-            //this.pitchRotation -= event.movementY * this.cameraSensitivity
-
-            // Limite verticale (évite de retourner la tête)
-            const maxPitch = Math.PI / 2 - 0.01
-            this.pitchRotation = Math.max(-maxPitch, Math.min(maxPitch, this.pitchRotation))
-
-            this.updateCamera()
+            this.cameraMovement(event)
         })
     }
 
@@ -119,6 +120,17 @@ export class Player{
         })
     }
 
+    cameraMovement(event) {
+
+        this.yawRotation -= event.movementX * this.cameraSensitivity
+        //this.pitchRotation -= event.movementY * this.cameraSensitivity
+
+        // Limite verticale (évite de retourner la tête)
+        const maxPitch = Math.PI / 2 - 0.01
+        this.pitchRotation = Math.max(-maxPitch, Math.min(maxPitch, this.pitchRotation))
+
+        this.updateCamera()
+    }
 
     updateCamera(){
         this.yawObject.rotation.y = this.yawRotation
@@ -135,11 +147,12 @@ export class Player{
         //this.camera.rotation.set(this.pitchRotation, this.yawRotation, 0);
     }
 
-    update(dt) {
+    update(dt, world) {
         if(this.mixer != null){
             this.mixer.update(dt)
         }
 
+        // Gestion du mouvement du joueur
 
         const forward = new THREE.Vector3();
         this.camera.getWorldDirection(forward);
@@ -180,11 +193,17 @@ export class Player{
             }
         }
 
-        this.isGrounded = Math.abs(this.gameObject.body.velocity.y) < 0.1;
+        const from = this.gameObject.body.position;
+        const to = new CANNON.Vec3(
+            this.gameObject.body.position.x,
+            this.gameObject.body.position.y - 0.5,
+            this.gameObject.body.position.z
+        );
 
+        let animationSprintSpeed = 1
         if (this.keys['KeyF']){
             this.speed = 30
-            this.fadeToAnimation("Sprint")
+            animationSprintSpeed = 3;
         }
         else{
             this.speed = 5
@@ -197,6 +216,12 @@ export class Player{
         let velocity = new CANNON.Vec3(0, 0, 0)
 
         if (validMove) {
+            if(this.isGrounded){
+                this.fadeToAnimation("Sprint", 0.3, animationSprintSpeed)
+            }
+            else{
+                this.fadeToAnimation("Fall")
+            }
 
             moveDirection.normalize()
 
@@ -205,6 +230,14 @@ export class Player{
 
         }
         else{
+            if(this.isGrounded){
+                this.fadeToAnimation("Idle")
+            }
+            else{
+                this.fadeToAnimation("Fall")
+            }
+
+
             velocity = new CANNON.Vec3(0, body.velocity.y, 0)
         }
 
@@ -216,18 +249,15 @@ export class Player{
 
         body.velocity.copy(velocity);
 
-        this.gameObject.updateMeshFromBody();
+        this.gameObject.FixUpdateMeshFromBody();
 
         this.updateCamera()
-
     }
 
     handleJump(dt){
         if(this.isGrounded && this.jumpRequest){
             this.isGrounded = false;
             this.jumpRequest = false;
-
-            console.log("Unleash Height Speed");
 
             this.gameObject.body.velocity.y = this.jumpVelocity;
         }
@@ -238,13 +268,22 @@ export class Player{
 
     }
 
-    fadeToAnimation(name, duration = 0.3) {
+    fadeToAnimation(name, duration = 0.3, animationSpeed = 1) {
 
         const newAction = this.animations[name]
 
+        if(newAction === undefined){
+            return;
+        }
+
+        newAction.timeScale = animationSpeed;
+
         if (this.currentAnimation !== newAction) {
 
-            this.currentAnimation.fadeOut(duration)
+            if(this.currentAnimation !== undefined){
+                this.currentAnimation.fadeOut(duration)
+            }
+
 
             newAction
                 .reset()
@@ -262,17 +301,36 @@ export class Player{
             const idleClip = idleGltf.animations[1]
             this.animations["Idle"] = this.mixer.clipAction(idleClip)
 
-            console.log(idleGltf.animations)
 
             loader.load('/assets/models/sprint.glb', (sprintGltf) => {
 
                 const sprintClip = sprintGltf.animations[1]
                 this.animations["Sprint"] = this.mixer.clipAction(sprintClip)
 
-                this.animations["Idle"].play()
-                this.currentAnimation = this.animations["Idle"]
+                loader.load('/assets/models/fall.glb', (fallGltf) => {
+                    const fallClip = fallGltf.animations[1]
+                    this.animations["Fall"] = this.mixer.clipAction(fallClip)
+
+                    this.animations["Idle"].play()
+                    this.currentAnimation = this.animations["Idle"]
+                })
 
             })
         })
     }
+
+    getPlayerPos(){
+        return this.gameObject.body.position;
+    }
+
+    getPlayerCell() {
+        let playerPos = this.getPlayerPos();
+
+        return {
+            x: Math.floor(playerPos.x),
+            y: Math.floor(playerPos.y),
+            z: Math.floor(playerPos.z)
+        };
+    }
+
 }
