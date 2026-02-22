@@ -31,9 +31,25 @@ export class GameObject{
     }
 
 
+    //updateMeshFromBody() {
+    //    this.mesh.position.copy(this.body.position);
+    //    this.mesh.quaternion.copy(this.body.quaternion);
+    //}
+
     updateMeshFromBody() {
-        this.mesh.position.copy(this.body.position);
-        this.mesh.quaternion.copy(this.body.quaternion);
+        // Copier la position
+        this.mesh.position.copy(this.body.position)
+
+        // Orientation uniquement sur l'axe Y (yaw)
+        // Calculer la direction du joueur
+        const dir = new THREE.Vector3(this.body.velocity.x, 0, this.body.velocity.z)
+
+        if (dir.lengthSq() > 0.0001) { // éviter NaN quand le joueur est immobile
+            dir.normalize()
+            const targetQuat = new THREE.Quaternion()
+            targetQuat.setFromUnitVectors(new THREE.Vector3(0,0,1), dir)
+            this.mesh.quaternion.slerp(targetQuat, 0.2) // smooth rotation
+        }
     }
 
     // Méthode update à appeler dans la boucle principale

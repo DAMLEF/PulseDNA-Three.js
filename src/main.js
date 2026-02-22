@@ -1,9 +1,12 @@
 import * as THREE from 'three'
 import * as CANNON from 'cannon-es'
 import {lerp} from "three/src/math/MathUtils";
+
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
 import {Player} from "./Player";
 import * as GO from  "./GameObject"
-import {GameObject} from "./GameObject";
+
 
 // =====================
 // THREE.JS (VISUEL)
@@ -101,11 +104,10 @@ cubeObject.setPosition(5, 15, 5)
 // Player Section
 const playerGO = new GO.SphereObject(0.5, 1, new THREE.MeshStandardMaterial({ color: 0x0000FF }))
 playerGO.setPosition(0, 2, 0);
-playerGO.initObject(scene, world, gameObjects)
 
+const loader = new GLTFLoader()
 
-
-let p = new Player(camera, renderer.domElement, playerGO);
+let p = new Player(camera, renderer.domElement, playerGO, scene, world, gameObjects, loader);
 
 // =====================
 // Système de Debug (Ajout d'une DIV pour visualiser des infos en TR
@@ -126,7 +128,7 @@ document.body.appendChild(infoDiv)
 // =====================
 const clock = new THREE.Clock()
 
-
+console.log(scene)
 function animate() {
     requestAnimationFrame(animate)
 
@@ -138,9 +140,11 @@ function animate() {
         go.update(go);
     }
 
+    p.update(delta)
+
     renderer.render(scene, camera)
 
-    p.update(delta)
+
 
     // ----- Affichage infos DEBUG -----
     infoDiv.innerHTML = `

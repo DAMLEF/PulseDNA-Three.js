@@ -2,16 +2,47 @@ import * as THREE from 'three'
 import * as CANNON from 'cannon-es'
 import {lerp} from "three/src/math/MathUtils";
 
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
 export class Player{
 
-    constructor(camera, domElement, gameObject) {
+    constructor(camera, domElement, gameObject, scene, world, goList, loader) {
+
+
+        // Accès au monde
         this.camera = camera;
         this.dE = domElement;
+        // --------------
 
+        // Type de caméra
         this.tps = true;
 
+        // GameObject du Joueur
         this.gameObject = gameObject;
 
+        this.mixer = null;     // Structure pour gérer les animations
+        this.animations = {};
+        this.currentAnimation = "Idle";
+
+        // Redéfinition du Mesh du joueur (à l'aide des fichiers glb)
+        console.log(loader)
+        loader.load('/assets/models/character.glb', (gltf) => {
+
+            // Retirer l'ancien mesh
+            delete gameObject.mesh
+
+            gameObject.mesh = gltf.scene
+
+            this.mixer = new THREE.AnimationMixer(gameObject.mesh)
+
+            console.log("Lancement du chargement des animations");
+
+            this.loadAnimations(loader)
+
+            this.gameObject.initObject(scene, world, goList)
+        })
+
+        // Camera Settings
         this.cameraDistance = 6.;
         this.cameraHeight = 2.;
 
@@ -26,12 +57,19 @@ export class Player{
 
         this.cameraSensitivity = 0.002;
 
+        // -----------------------------------------
+
+        // Paramètres physique
+
         this.speed = 5
-        this.keys = {}
 
         this.jumpHeight = 20;
         this.timeToApex = 5;
         this.fallMultiplier = 2.5;
+
+        // -----------------------------------------
+
+        this.keys = {}
 
         // Calculs physiques dérivés
         this.gravity = (2 * this.jumpHeight) / (this.timeToApex ** 2);
@@ -44,6 +82,10 @@ export class Player{
         this.initPointerLock();
         this.initMouseMove();
         this.initKeyboard();
+
+
+
+        console.log("FIN INITIALISATION");
 
     }
 
@@ -94,6 +136,11 @@ export class Player{
     }
 
     update(dt) {
+        if(this.mixer != null){
+            this.mixer.update(dt)
+        }
+
+
         const forward = new THREE.Vector3();
         this.camera.getWorldDirection(forward);
         forward.y = 0;
@@ -137,6 +184,7 @@ export class Player{
 
         if (this.keys['KeyF']){
             this.speed = 30
+            this.fadeToAnimation("Sprint")
         }
         else{
             this.speed = 5
@@ -188,5 +236,43 @@ export class Player{
             this.gameObject.body.velocity.y -= this.gravity *  this.fallMultiplier * dt
         }
 
+    }
+
+    fadeToAnimation(name, duration = 0.3) {
+
+        const newAction = this.animations[name]
+
+        if (this.currentAnimation !== newAction) {
+
+            this.currentAnimation.fadeOut(duration)
+
+            newAction
+                .reset()
+                .fadeIn(duration)
+                .play()
+
+            this.currentAnimation = newAction
+        }
+    }
+
+
+    loadAnimations(loader){
+        loader.load('/assets/models/idle.glb', (idleGltf) => {
+
+            const idleClip = idleGltf.animations[1]
+            this.animations["Idle"] = this.mixer.clipAction(idleClip)
+
+            console.log(idleGltf.animations)
+
+            loader.load('/assets/models/sprint.glb', (sprintGltf) => {
+
+                const sprintClip = sprintGltf.animations[1]
+                this.animations["Sprint"] = this.mixer.clipAction(sprintClip)
+
+                this.animations["Idle"].play()
+                this.currentAnimation = this.animations["Idle"]
+
+            })
+        })
     }
 }
