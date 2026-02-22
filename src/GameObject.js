@@ -30,11 +30,12 @@ export class GameObject{
         this.updateMeshFromBody();
     }
 
-
+    // TODO : Attention
     //updateMeshFromBody() {
     //    this.mesh.position.copy(this.body.position);
     //    this.mesh.quaternion.copy(this.body.quaternion);
     //}
+
 
     updateMeshFromBody() {
         // Copier la position
