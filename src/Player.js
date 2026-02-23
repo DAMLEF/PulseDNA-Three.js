@@ -73,6 +73,10 @@ export class Player{
         // Paramètres physiques
 
         this.speed = 5
+        this.baseMaxSpeed = 30;
+        this.maxSpeed = this.baseMaxSpeed;
+
+        this.walkSpeed = 5
 
         this.jumpHeight = 20;
         this.timeToApex = 5;
@@ -112,6 +116,7 @@ export class Player{
     }
 
     initKeyboard() {
+
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true
         })
@@ -147,6 +152,11 @@ export class Player{
         //this.camera.rotation.set(this.pitchRotation, this.yawRotation, 0);
     }
 
+    upgradeSpeed(speedUpgrade){
+        this.maxSpeed += speedUpgrade
+
+    }
+
     update(dt, world) {
         if(this.mixer != null){
             this.mixer.update(dt)
@@ -166,8 +176,6 @@ export class Player{
         const moveDirection = new THREE.Vector3(0, 0, 0);
         let validMove = false;
 
-        //const direction = new THREE.Vector3(this.body.position.x - this.camera.position.x, 0, this.body.position.z - this.camera.position.z)
-        //direction.normalize()
 
         if (this.keys['KeyW']){
             moveDirection.add(forward)
@@ -193,20 +201,14 @@ export class Player{
             }
         }
 
-        const from = this.gameObject.body.position;
-        const to = new CANNON.Vec3(
-            this.gameObject.body.position.x,
-            this.gameObject.body.position.y - 0.5,
-            this.gameObject.body.position.z
-        );
-
         let animationSprintSpeed = 1
         if (this.keys['KeyF']){
-            this.speed = 30
+            this.speed = this.maxSpeed
+            // TODO: Changer la vitesse selon la vitesse courante / Vitesse graduelle
             animationSprintSpeed = 3;
         }
         else{
-            this.speed = 5
+            this.speed = this.walkSpeed
         }
 
         this.handleJump(dt)
@@ -244,7 +246,7 @@ export class Player{
         const speedFactor = body.velocity.length();
         this.cameraDistance = 6 + speedFactor * 0.05;
 
-        this.camera.fov = lerp(70, 95, speedFactor / 30);
+        this.camera.fov = lerp(70, 95, speedFactor / (this.baseMaxSpeed * 2));
         this.camera.updateProjectionMatrix();
 
         body.velocity.copy(velocity);

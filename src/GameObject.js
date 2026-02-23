@@ -17,7 +17,6 @@ export class GameObject{
 
         // Synchronisation Three.JS <-> Cannon-es
         this.updateMeshFromBody();
-
     }
 
     initObject(scene, world, goList){
@@ -25,6 +24,13 @@ export class GameObject{
         world.addBody(this.body);
 
         goList.push(this);
+    }
+
+    deleteObject(scene, world, goList){
+        world.removeBody(this.body);
+        scene.remove(this.mesh);
+        goList.filter(x => x !== this)
+
     }
 
     setPosition(x, y, z) {
@@ -130,3 +136,4 @@ export class PlaneObject extends GameObject {
         this.mesh.position.set(this.body.position.x, this.body.position.y + 1, this.body.position.z)
     }
 }
+

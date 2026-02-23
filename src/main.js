@@ -32,10 +32,29 @@ const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
+function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+        renderer.setSize(width, height, false);
+    }
+    return needResize;
+}
+
+renderer.setClearColor(new THREE.Color(0.474509, 0.61568, 0.709803))
+
 // Lumière
 const light = new THREE.DirectionalLight(0xffffff, 1)
 light.position.set(5, 10, 5)
 scene.add(light)
+
+const playerLight = new THREE.DirectionalLight(0xccd2ff, 3)
+playerLight.position.set(-0, 3, -0)
+scene.add(playerLight)
 
 let gameObjects = [];
 
@@ -99,12 +118,9 @@ const testShaderMat = new THREE.ShaderMaterial({
     color: 0xff0000,
 });
 
-const cubeObject = new GO.CubeObject(1, 1, testShaderMat)
-cubeObject.initObject(scene, world, gameObjects)
-cubeObject.setPosition(3, 15, 3)
+
 
 // Test néon
-
 let tubeOffset = 8
 let tubeGridSize = 75
 let gridLastCenter = {x: 0, y: 0, z: 0}
@@ -217,7 +233,7 @@ composer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    1.5,  // strength
+    0.4,  // strength
     0.4,  // radius
     0.85  // threshold
 );
@@ -309,7 +325,54 @@ let p = new Player(camera, renderer.domElement, playerGO, scene, world, gameObje
 createGrid(playerGO.body.position)
 
 // Game Manager
-const gm = new GM.GameManager();
+const gm = new GM.GameManager(scene, loader);
+
+
+// ==========================
+// Système de Particules
+// ===========================
+
+const particleGeometry = new THREE.BufferGeometry()
+const particleCount = 400
+const particlePositions = new Float32Array(particleCount * 3)
+const particleColors = new Float32Array(particleCount * 3)
+
+for(let i = 0; i < particleCount; i++){
+    const i3 = i * 3
+
+    // X et Z proches du centre (zone réduite)
+    particlePositions[i3]     = (Math.random() - 0.5) * 10 // X
+    particlePositions[i3 + 1] = 0.5                  // Y FIXE
+    particlePositions[i3 + 2] = (Math.random() - 0.5) * 10 // Z
+
+    // Couleur blanche (RGB = 1,1,1)
+    particleColors[i3]     = 1
+    particleColors[i3 + 1] = 1
+    particleColors[i3 + 2] = 1
+}
+
+particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
+particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3))
+
+const particleMaterial = new THREE.PointsMaterial(
+    {
+        size: 0.05,
+        sizeAttenuation: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+    }
+)
+
+const particleMesh = new THREE.Points(particleGeometry, particleMaterial)
+
+particleMesh.position.set(0, 0, 0)
+
+const baseParticlePositions = particlePositions.slice()
+
+scene.add(particleMesh)
+
 
 // =====================
 // Système de Debug (Ajout d'une DIV pour visualiser des infos en TR
@@ -333,11 +396,22 @@ const clock = new THREE.Clock()
 let gridOffset = 0;
 let playerCellPos;
 
+
+
+
+
 function animate() {
     requestAnimationFrame(animate)
 
+
+
     const delta = clock.getDelta()
     world.step(1 / 60, delta)
+
+
+    // Actualisation de la lumière du joueur
+    playerLight.target.position.copy(p.gameObject.mesh.position)
+    playerLight.target.updateMatrixWorld()
 
     // Synchronisation Cannon → Three
     for(const go of gameObjects){
@@ -347,7 +421,7 @@ function animate() {
 
     p.update(delta, world)
 
-    gm.update(scene, world, gameObjects, testShaderMat);
+    gm.update(delta, scene, world, gameObjects, testShaderMat, p);
 
     //renderer.render(scene, camera)
     composer.render(delta);
@@ -358,19 +432,48 @@ function animate() {
         Math.abs(gridLastCenter.z - playerCellPos.z));
 
     if(gridOffset > 5){
-        createGrid(getSnappedCenter(playerCellPos));
+        // TODO : Grille désactivé
+        //createGrid(getSnappedCenter(playerCellPos));
         gridLastCenter = playerCellPos;
     }
 
+    // Actualisation des particules
+    //particleMesh.position.set(playerGO.body.position.x, playerGO.body.position.y, playerGO.body.position.z);
+
+    let positions = particleGeometry.attributes.position.array
+
+    for (let i = 0; i < particleCount; i++) {
+
+        const i3 = i * 3
+
+        const x = baseParticlePositions[i3]
+        const z = baseParticlePositions[i3 + 2]
+
+        const distance = Math.sqrt(x * x + z * z)
+
+        const amplitude = 0.3      // très léger
+        const frequency = 4        // densité des vagues
+        const speed = 1           // vitesse propagation
+
+        positions[i3 + 1] =
+            Math.sin(distance * frequency - clock.getElapsedTime() * speed)
+            * amplitude
+    }
+
+    particleGeometry.attributes.position.needsUpdate = true
+
     // ----- Affichage infos DEBUG -----
     infoDiv.innerHTML = `
-    FPS: ${(1 / delta).toFixed(5)} <br>, 
+    FPS: ${(1 / delta).toFixed(5)} <br>
     Position: x=${playerGO.body.position.x.toFixed(2)}, 
     y=${playerGO.body.position.y.toFixed(2)}, 
     z=${playerGO.body.position.z.toFixed(2)}<br>
     Camera rotation: yaw=${(p.yawRotation*180/Math.PI).toFixed(1)}°, 
     pitch=${(p.pitchRotation*180/Math.PI).toFixed(1)}°<br>
-    Velocity : x =${playerGO.body.velocity.x.toFixed(1)} y=${playerGO.body.velocity.y.toFixed(1)} z=${playerGO.body.velocity.z.toFixed(1)}`
+    Velocity : x =${playerGO.body.velocity.x.toFixed(1)} y=${playerGO.body.velocity.y.toFixed(1)} z=${playerGO.body.velocity.z.toFixed(1)} <br>
+    Speed : ${p.speed} <br>
+    Max Speed: ${p.maxSpeed}`
+
 
 
 
@@ -379,6 +482,12 @@ function animate() {
     if (materialNeon.userData.shader) {
         materialNeon.userData.shader.uniforms.uTime.value = clock.getElapsedTime();
         materialNeon.userData.shader.uniforms.uPlayerPos.value.copy(playerGO.body.position);
+    }
+
+    if (resizeRendererToDisplaySize(renderer)) {
+        const canvas = renderer.domElement;
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
     }
 
 }
