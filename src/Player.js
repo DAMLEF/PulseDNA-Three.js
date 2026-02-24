@@ -78,6 +78,9 @@ export class Player{
 
         this.walkSpeed = 5
 
+        this.accelerationTime = 0.3   // Temps pour atteindre sa vitesse max
+
+
         this.jumpHeight = 20;
         this.timeToApex = 5;
         this.fallMultiplier = 2.5;
@@ -202,9 +205,11 @@ export class Player{
         }
 
         let animationSprintSpeed = 1
+        let sprint = false;
         if (this.keys['KeyF']){
-            this.speed = this.maxSpeed
-            // TODO: Changer la vitesse selon la vitesse courante / Vitesse graduelle
+            sprint = true;
+
+            // TODO: Améliorer la fluidité de l'animation de sprint
             animationSprintSpeed = 3;
         }
         else{
@@ -218,6 +223,12 @@ export class Player{
         let velocity = new CANNON.Vec3(0, 0, 0)
 
         if (validMove) {
+            if(sprint){
+                if(this.speed <= this.maxSpeed){
+                    this.speed += (this.maxSpeed / this.accelerationTime) * dt;
+                }
+            }
+
             if(this.isGrounded){
                 this.fadeToAnimation("Sprint", 0.3, animationSprintSpeed)
             }

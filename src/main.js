@@ -94,9 +94,7 @@ let vertexShaderCode = `
     }
   `;
 
-const testShaderMat = new THREE.ShaderMaterial({
-    vertexShader: vertexShaderCode,
-    fragmentShader: `
+let fragmentShaderCode = `
     varying float vExplodeFactor;
 
     void main() {
@@ -107,7 +105,11 @@ const testShaderMat = new THREE.ShaderMaterial({
         vec3 finalColor = mix(baseColor, explodedColor, vExplodeFactor);
 
         gl_FragColor = vec4(finalColor, 1.0);
-    }`,
+    }`;
+
+const testShaderMat = new THREE.ShaderMaterial({
+    vertexShader: vertexShaderCode,
+    fragmentShader: fragmentShaderCode,
     uniforms: {
         uPlayerPosition: { value: new THREE.Vector3() },
         uMinDistance: { value: 15.0 },   // x
@@ -221,6 +223,8 @@ materialNeon.onBeforeCompile = (shader) => {
     // on garde une référence pour update plus tard
     materialNeon.userData.shader = shader;
 };
+
+
 
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -397,8 +401,11 @@ let gridOffset = 0;
 let playerCellPos;
 
 
-
-
+let alreadyGO = false;
+function gameOver(){
+    alreadyGO = true;
+    location.reload()
+}
 
 function animate() {
     requestAnimationFrame(animate)
@@ -425,6 +432,11 @@ function animate() {
 
     //renderer.render(scene, camera)
     composer.render(delta);
+
+    // Détection de la fin du jeu
+    if(playerGO.body.position.y <= -30 && !alreadyGO){
+        gameOver();
+    }
 
     // Actualisez la grille
     playerCellPos = getSnappedCenter(p.getPlayerCell());
@@ -473,8 +485,6 @@ function animate() {
     Velocity : x =${playerGO.body.velocity.x.toFixed(1)} y=${playerGO.body.velocity.y.toFixed(1)} z=${playerGO.body.velocity.z.toFixed(1)} <br>
     Speed : ${p.speed} <br>
     Max Speed: ${p.maxSpeed}`
-
-
 
 
     testShaderMat.uniforms.uPlayerPosition.value.copy(playerGO.body.position);
